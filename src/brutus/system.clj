@@ -1,7 +1,6 @@
-(ns brute.system
+(ns brutus.system
   "Utility functions for system management.
   Systems in brute are simply functions that manage aspects like Physics, Rendering, Camera etc"
-  #+clj
   (:require [clojure.math.numeric-tower :as m]))
 
 (defn add-system-fn
@@ -21,7 +20,7 @@
     (reduce (fn [v _]                                       ;; this takes care of when the framerate
               (swap! atom - threshhold)                     ;; is WAY slower than the throttle.
               (system-fn v delta))
-            system (-> @atom (/ threshhold) #+clj m/floor #+cljs Math/floor range))
+            system (-> @atom (/ threshhold) m/floor range))
     system))
 
 (defn add-throttled-system-fn

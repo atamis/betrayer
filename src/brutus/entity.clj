@@ -1,14 +1,9 @@
 (ns ^{:doc "Entity Manager functions for the Brute Entity Component System"}
-    brute.entity)
+    brutus.entity)
 
 (defn create-uuid []
-  #+clj (java.util.UUID/randomUUID)
-  #+cljs
-  (let [template "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
-        f #(let [r (Math/floor (* (rand) 16))
-                 v (if (= % \x) r (bit-or (bit-and r 0x3) 0x8))]
-             (.toString v 16))]
-    (.replace template (js/RegExp. "[xy]" "g") f)))
+  (java.util.UUID/randomUUID)
+  )
 
 (defn create-system
     "Creates the system data structure that will need to be passed to all entity functions"
@@ -41,11 +36,11 @@
 (defmulti get-component-type
           "Returns the type for a given component. Using a multimethod with 'class' as the dispatch-fn to allow for extensibility per application.
           By default returns the class of the component."
-          #+clj class #+cljs type)
+          class)
 
 (defmethod get-component-type :default
            [component]
-    (#+clj class #+cljs type component))
+    (class component))
 
 
 (defn add-component
