@@ -69,7 +69,7 @@
                                new-component (update component :n inc)
                                new-entity (ecs/add-entity!)]
                            (event/add-event new-entity)
-                           (ecs/add-component new-entity :dummy {:component :dummy})
+                           (ecs/add-component new-entity :dummy :dummy)
                            (ecs/add-component new-component)))))
 
   (t/testing "adding entities"
@@ -78,9 +78,9 @@
       (t/is (= [] (ecs/get-all-entities-with-component sys :dummy)))
 
       ; Tick
-      (t/is (= {:component :entity-spawner :n 0} (ecs/get-component sys entity :entity-spawner)))
+      (t/is (= {:n 0} (ecs/get-component sys entity :entity-spawner)))
       (def new-sys (ecs/process-tick sys 1))
-      (t/is (= {:component :entity-spawner :n 1} (ecs/get-component new-sys entity :entity-spawner)))
+      (t/is (= {:n 1} (ecs/get-component new-sys entity :entity-spawner)))
 
       ; Check the first spawned entity
       (def events (event/drain-events new-sys))
@@ -123,7 +123,7 @@
     (def entity (ecs/create-entity))
     (def system (-> @sys
                     (ecs/add-entity entity)
-                    (ecs/add-component entity :tick {:component :tick :n 0 :m 0})
+                    (ecs/add-component entity :tick {:n 0 :m 0})
                     (ecs/add-system (ecs/mapping-system :tick #(update %1 :n inc)))
                     (ecs/add-system (ecs/mapping-system :tick (fn [component delta] (update component :m #(+ delta %1)))))
                     ))

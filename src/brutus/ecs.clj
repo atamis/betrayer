@@ -141,7 +141,7 @@
   ([system data fun] (add-singleton-ref system (gensym) data fun))
   ([system type data fun]
    (let [entity    (create-entity)
-         component (assoc data :component type)
+         component data
          system    (-> system
                        (add-entity entity)
                        (add-component entity type component)
