@@ -1,21 +1,31 @@
 (ns brutus.ecs
-  (:require [brutus.entity :as entity]
-            [brutus.system :as system]
+  (:require 
             [brutus.util :as util]))
 
-(defmethod entity/get-component-type clojure.lang.PersistentArrayMap
+(defmulti get-component-type
+  "Returns the type for a given component. Using a multimethod with 'class' as the dispatch-fn to allow for extensibility per application.
+          By default returns the class of the component."
+  class)
+
+(defmethod get-component-type clojure.lang.PersistentArrayMap
   [component]
   (:component component))
 
-(defmethod entity/get-component-type clojure.lang.PersistentHashMap
+(defmethod get-component-type clojure.lang.PersistentHashMap
   [component]
   (:component component))
 
-(def get-component-type entity/get-component-type)
+(defmethod get-component-type :default
+  [component]
+  (class component))
 
 (defn create-system
+  "Creates the system data structure that will need to be passed to all entity functions"
   []
-  (entity/create-system))
+  {;; Nested Map of Component Types -> Entity -> Component Instance
+   :entity-components      {}
+   ;; Map of Entities -> Set of Component Types
+   :entity-component-types {}})
 
 (defn ^:private remove-component-internal
   "Remove a component instance from the ES data structure and returns it"
@@ -28,6 +38,11 @@
          (assoc! :entity-component-types (assoc entity-component-types entity (-> entity-component-types (get entity) (disj type))))
          persistent!))))
 
+(defn create-uuid []
+  (java.util.UUID/randomUUID))
+
+(def create-entity create-uuid)
+
 (declare iterating-system)
 
 (def ^:dynamic current-sys-ref nil)
@@ -36,26 +51,51 @@
 
 (defn get-component
   ([type]
-   (entity/get-component @current-sys-ref current-entity type))
+   (get-component @current-sys-ref current-entity type))
   ([entity type]
-   (entity/get-component @current-sys-ref entity type))
+   (get-component @current-sys-ref entity type))
   ([system entity type]
-   (entity/get-component system entity type)))
+   (-> system :entity-components (get-in [type entity]))))
 
 (defn add-entity
-  ([] (dosync (alter current-sys-ref #(entity/add-entity %1 (entity/create-entity)))))
-  ([entity] (dosync (alter current-sys-ref #(entity/add-entity %1 entity))))
-  ([system entity] (entity/add-entity system entity)))
+  ([] (dosync (alter current-sys-ref #(add-entity %1 (create-entity)))))
+  ([entity] (dosync (alter current-sys-ref #(add-entity %1 entity))))
+  ([system entity]
+   (let [system (transient system)]
+     (-> system
+         (assoc! :entity-component-types (-> system :entity-component-types (assoc entity #{})))
+         persistent!))))
 
 (defn add-component
-  ([component] (dosync (alter current-sys-ref #(entity/add-component %1 current-entity component))))
-  ([entity component] (dosync (alter current-sys-ref #(entity/add-component %1 entity component))))
-  ([system entity component] (entity/add-component system entity component)))
+  ([component] (dosync (alter current-sys-ref #(add-component %1 current-entity component))))
+  ([entity component] (dosync (alter current-sys-ref #(add-component %1 entity component))))
+  ([system entity instance]
+   (let [type (get-component-type instance)
+         system (transient system)
+         ecs (:entity-components system)
+         ects (:entity-component-types system)]
+     (-> system
+         (assoc! :entity-components (assoc-in ecs [type entity] instance))
+         (assoc! :entity-component-types (assoc ects entity (-> ects (get entity) (conj type))))
+         persistent!))))
+
+(defn update-component
+  [system entity type fn & args]
+  (if-let [update (apply fn (get-component system entity type) args)]
+    (add-component system entity update)
+    system))
 
 (defn kill-entity
-  ([] (dosync (alter current-sys-ref #(entity/kill-entity %1 current-entity))))
-  ([entity] (alter current-sys-ref #(entity/kill-entity %1 entity)))
-  ([system entity] (entity/kill-entity system entity)))
+  ([] (dosync (alter current-sys-ref #(kill-entity %1 current-entity))))
+  ([entity] (alter current-sys-ref #(kill-entity %1 entity)))
+  ([system entity]
+   (let [system (transient system)
+         entity-component-types (:entity-component-types system)]
+     (-> system
+         (assoc! :entity-component-types (dissoc entity-component-types entity))
+         (assoc! :entity-components (persistent! (reduce (fn [v type] (assoc! v type (dissoc (get v type) entity)))
+                                                         (transient (:entity-components system)) (get entity-component-types entity))))
+         persistent!))))
 
 (defn remove-component
   ([] (dosync (alter current-sys-ref #(remove-component %1 current-entity current-type))))
@@ -70,27 +110,30 @@
          (assoc! :entity-component-types (assoc entity-component-types entity (-> entity-component-types (get entity) (disj type))))
          persistent!))))
 
-
-
 (defn add-entity!
   []
-  (let [entity (entity/create-entity)]
-    (dosync (alter current-sys-ref #(entity/add-entity %1 entity)))
+  (let [entity (create-entity)]
+    (dosync (alter current-sys-ref #(add-entity %1 entity)))
     entity))
 
-(def create-entity entity/create-entity)
-(def add-system system/add-system-fn)
-(def get-all-entities-with-component entity/get-all-entities-with-component)
+(defn add-system
+  [system fun]
+  (assoc system :system-fns (conj (:system-fns system) fun)))
+
+(defn get-all-entities-with-component [system type] (or (-> system :entity-components (get type) keys) []))
 (defn add-iterating-system
   [system type fun]
   (add-system system (iterating-system type fun)))
-(def process-tick system/process-one-game-tick)
+(defn process-tick
+  [system delta]
+  (reduce (fn [sys sys-fn] (sys-fn sys delta))
+          system (:system-fns system)))
 
 (defn iterating-system
   [type fun]
   (fn [system delta]
     (let [sys-ref (ref system)]
-      (doseq [entity (entity/get-all-entities-with-component system type)]
+      (doseq [entity (get-all-entities-with-component system type)]
         (let [local-entity entity
               local-type   type]
           (binding [current-sys-ref sys-ref
@@ -106,7 +149,7 @@
     (let [adapted-fun (util/make-flexible-fn fun)]
       (reduce
        (fn [system entity]
-         (entity/update-component system entity type adapted-fun delta))
+         (update-component system entity type adapted-fun delta))
        system
        (get-all-entities-with-component system type)))))
 
