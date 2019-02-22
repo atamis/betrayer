@@ -33,3 +33,13 @@
 (defn make-flexible-fn
   [fun]
   (fn [& args] (apply-flex-arity fun args)))
+
+(defn not-nil!
+  ([x]
+   (not-nil! x "Expected not nil, got nil")
+   )
+  ([x msg]
+   (assert (some? x) msg)
+   x
+   )
+  )

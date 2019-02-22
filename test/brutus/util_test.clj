@@ -48,4 +48,13 @@
 
     (let [f2 (util/make-flexible-fn (fn [component delta] (update component :m #(+ delta %1))))]
       (t/is (f2 {:m 0} 0))
-      (t/is (thrown? clojure.lang.ArityException (f2 {:m 0}))))))
+      (t/is (thrown? clojure.lang.ArityException (f2 {:m 0})))))
+  (t/testing "not-nil!"
+    (t/is :test (util/not-nil! :test))
+    (t/is :test (util/not-nil! :test "Test message"))
+
+    (t/is (thrown? java.lang.AssertionError (util/not-nil! nil)))
+    (t/is (thrown? java.lang.AssertionError (util/not-nil! nil "Was nil")))
+
+    )
+  )

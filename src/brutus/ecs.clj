@@ -109,7 +109,7 @@
   (add-system system (iterating-system type fun)))
 (defn process-tick
   [system delta]
-  (reduce (fn [sys sys-fn] (sys-fn sys delta))
+  (reduce (fn [sys sys-fn] (util/not-nil! (sys-fn sys delta) "System function returned nil"))
           system (:system-fns system)))
 
 (defn iterating-system
