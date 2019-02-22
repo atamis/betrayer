@@ -69,7 +69,7 @@
                                new-component (update component :n inc)
                                new-entity (ecs/add-entity!)]
                            (event/add-event new-entity)
-                           (ecs/add-component new-entity {:component :dummy})
+                           (ecs/add-component new-entity :dummy {:component :dummy})
                            (ecs/add-component new-component)))))
 
   (t/testing "adding entities"
@@ -123,7 +123,7 @@
     (def entity (ecs/create-entity))
     (def system (-> @sys
                     (ecs/add-entity entity)
-                    (ecs/add-component entity {:component :tick :n 0 :m 0})
+                    (ecs/add-component entity :tick {:component :tick :n 0 :m 0})
                     (ecs/add-system (ecs/mapping-system :tick #(update %1 :n inc)))
                     (ecs/add-system (ecs/mapping-system :tick (fn [component delta] (update component :m #(+ delta %1)))))
                     ))

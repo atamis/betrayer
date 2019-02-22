@@ -2,23 +2,6 @@
   (:require 
             [brutus.util :as util]))
 
-(defmulti get-component-type
-  "Returns the type for a given component. Using a multimethod with 'class' as the dispatch-fn to allow for extensibility per application.
-          By default returns the class of the component."
-  class)
-
-(defmethod get-component-type clojure.lang.PersistentArrayMap
-  [component]
-  (:component component))
-
-(defmethod get-component-type clojure.lang.PersistentHashMap
-  [component]
-  (:component component))
-
-(defmethod get-component-type :default
-  [component]
-  (class component))
-
 (defn create-system
   "Creates the system data structure that will need to be passed to all entity functions"
   []
@@ -67,11 +50,11 @@
          persistent!))))
 
 (defn add-component
-  ([component] (dosync (alter current-sys-ref #(add-component %1 current-entity component))))
-  ([entity component] (dosync (alter current-sys-ref #(add-component %1 entity component))))
-  ([system entity instance]
-   (let [type (get-component-type instance)
-         system (transient system)
+  ([component] (dosync (alter current-sys-ref #(add-component %1 current-entity current-type component))))
+  ([type component] (dosync (alter current-sys-ref #(add-component %1 current-entity type component))))
+  ([entity type component] (dosync (alter current-sys-ref #(add-component %1 entity type component))))
+  ([system entity type instance]
+   (let [system (transient system)
          ecs (:entity-components system)
          ects (:entity-component-types system)]
      (-> system
@@ -82,7 +65,7 @@
 (defn update-component
   [system entity type fn & args]
   (if-let [update (apply fn (get-component system entity type) args)]
-    (add-component system entity update)
+    (add-component system entity type update)
     system))
 
 (defn kill-entity
@@ -161,7 +144,7 @@
          component (assoc data :component type)
          system    (-> system
                        (add-entity entity)
-                       (add-component entity component)
+                       (add-component entity type component)
                        (add-iterating-system type fun))]
      [system entity])))
 
