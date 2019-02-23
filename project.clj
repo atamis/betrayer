@@ -8,4 +8,5 @@
                            [im.chit/purnam.test "0.4.3"]]
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}}
+  :plugins [[lein-codox "0.10.6"]]
   )
