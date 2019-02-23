@@ -9,7 +9,7 @@
 
 (defn setup-sys
   [f]
-  (binding [sys (ref (event/add-event-system (ecs/create-system)))]
+  (binding [sys (ref (event/add-event-system (ecs/create-world)))]
     (f)))
 
 (defn same-elements

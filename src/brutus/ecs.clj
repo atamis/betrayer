@@ -1,19 +1,23 @@
 (ns brutus.ecs
-  "Functions for creating and modifying ECS systems.
+  "Functions for creating and modifying ECS worlds.
 
   Note that `ecs/current-sys-ref`, `ecs/current-entity`, and `ecs/current-type`
-  are dynamic vars that can be set with `with-system-context`. These dynamic
+  are dynamic vars that can be set with `with-world-context`. These dynamic
   vars are used in several functions to elide parameters. See
-  `with-system-context` for more information."
+  `with-world-context` for more information.
+
+  Worlds consist of entities with components attached to them, where components
+  are tags (typically symbols) with attached data. Systems are functions which
+  take a world and return a new world. See `mapping-system` and `iterating-system`
+  for more nuanced system options.
+  "
   (:require
    [brutus.util :as util]
    [clojure.math.numeric-tower :as m]
    ))
 
-;; TODO: rename system to world?
-
-(defn create-system
-  "Creates an empty system."
+(defn create-world
+  "Creates an empty world."
   []
   {;; Nested Map of Component Types -> Entity -> Component Instance
    :entity-components      {}
@@ -21,12 +25,11 @@
    :entity-component-types {}})
 
 (defn ^:private remove-component-internal
-  "Remove a component instance from the ES data structure and returns it"
-  ([system entity type]
-   (let [system (transient system)
-         entity-components (:entity-components system)
-         entity-component-types (:entity-component-types system)]
-     (-> system
+  ([world entity type]
+   (let [world (transient world)
+         entity-components (:entity-components world)
+         entity-component-types (:entity-component-types world)]
+     (-> world
          (assoc! :entity-components
                  (assoc entity-components type (-> entity-components
                                                    (get type)
@@ -43,14 +46,14 @@
   (java.util.UUID/randomUUID))
 
 (defn create-entity
-  "Generate a new random UUID. See `create-uuid` and `Java.util.UUID/randomUUID`."
+  "Generate a new random ID. See `create-uuid` and `Java.util.UUID/randomUUID`."
   []
   (create-uuid))
 
 (declare iterating-system)
 
-(def ^:dynamic current-sys-ref
-  "Dynamic var representing the current system reference."
+(def ^:dynamic current-world-ref
+  "Dynamic var representing the current world reference."
   nil)
 (def ^:dynamic current-entity
   "Dynamic var representing the current entity UUID."
@@ -60,45 +63,45 @@
   nil)
 
 (defn get-component
-  "Get the component from an entity in the system with this type."
+  "Get the component from an entity in the world with this type."
   ([type]
-   (get-component @current-sys-ref current-entity type))
+   (get-component @current-world-ref current-entity type))
   ([entity type]
-   (get-component @current-sys-ref entity type))
-  ([system entity type]
-   (-> system :entity-components (get-in [type entity]))))
+   (get-component @current-world-ref entity type))
+  ([world entity type]
+   (-> world :entity-components (get-in [type entity]))))
 
 (defn add-entity
-  "Add an entity to the system. Also see `add-entity!` for a more useful function."
+  "Add an entity to the world. Also see `add-entity!` for a more useful function."
   ; TODO: make this not as bad.
-  ([] (dosync (alter current-sys-ref #(add-entity %1 (create-entity)))))
-  ([entity] (dosync (alter current-sys-ref #(add-entity %1 entity))))
-  ([system entity]
-   (let [system (transient system)]
-     (-> system
+  ([] (dosync (alter current-world-ref #(add-entity %1 (create-entity)))))
+  ([entity] (dosync (alter current-world-ref #(add-entity %1 entity))))
+  ([world entity]
+   (let [world (transient world)]
+     (-> world
          (assoc! :entity-component-types
-                 (-> system :entity-component-types (assoc entity #{})))
+                 (-> world :entity-component-types (assoc entity #{})))
          persistent!))))
 
 (defn add-entity!
-  "Add an entity to the current system (`current-sys-ref`), and return the ID of
+  "Add an entity to the current world (`current-world-ref`), and return the ID of
   the newly created entity."
   []
   (let [entity (create-entity)]
-    (dosync (alter current-sys-ref #(add-entity %1 entity)))
+    (dosync (alter current-world-ref #(add-entity %1 entity)))
     entity))
 
 (defn add-component
-  "Add a component or a specific type to an entity in a system, or updates an
+  "Add a component of a specific type to an entity in a world, or updates an
   existing component with new data."
-  ([component] (dosync (alter current-sys-ref #(add-component %1 current-entity current-type component))))
-  ([type component] (dosync (alter current-sys-ref #(add-component %1 current-entity type component))))
-  ([entity type component] (dosync (alter current-sys-ref #(add-component %1 entity type component))))
-  ([system entity type instance]
-   (let [system (transient system)
-         ecs (:entity-components system)
-         ects (:entity-component-types system)]
-     (-> system
+  ([component] (dosync (alter current-world-ref #(add-component %1 current-entity current-type component))))
+  ([type component] (dosync (alter current-world-ref #(add-component %1 current-entity type component))))
+  ([entity type component] (dosync (alter current-world-ref #(add-component %1 entity type component))))
+  ([world entity type instance]
+   (let [world (transient world)
+         ecs (:entity-components world)
+         ects (:entity-component-types world)]
+     (-> world
          (assoc! :entity-components (assoc-in ecs [type entity] instance))
          (assoc! :entity-component-types (assoc ects entity (-> ects (get entity) (conj type))))
          persistent!))))
@@ -108,76 +111,77 @@
   function is passed the component data and any additional args. If the function
   returns nil, the component is not updated. Otherwise, the component data is updated
   with the return value."
-  [system entity type fun & args]
-  (if-let [update (apply fun (get-component system entity type) args)]
-    (add-component system entity type update)
-    system))
+  [world entity type fun & args]
+  (if-let [update (apply fun (get-component world entity type) args)]
+    (add-component world entity type update)
+    world))
 
 (defn kill-entity
   "Removes an entitity and all its components and returns it."
-  ([] (dosync (alter current-sys-ref #(kill-entity %1 current-entity))))
-  ([entity] (alter current-sys-ref #(kill-entity %1 entity)))
-  ([system entity]
-   (let [system (transient system)
-         entity-component-types (:entity-component-types system)]
-     (-> system
+  ([] (dosync (alter current-world-ref #(kill-entity %1 current-entity))))
+  ([entity] (alter current-world-ref #(kill-entity %1 entity)))
+  ([world entity]
+   (let [world (transient world)
+         entity-component-types (:entity-component-types world)]
+     (-> world
          (assoc! :entity-component-types (dissoc entity-component-types entity))
          (assoc! :entity-components
                  (persistent! (reduce (fn [v type]
                                         (assoc! v type (dissoc (get v type) entity)))
-                                      (transient (:entity-components system))
+                                      (transient (:entity-components world))
                                       (get entity-component-types entity))))
          persistent!))))
 
 (defn remove-component
-  "Remove a component instance from the system and returns it."
-  ([] (dosync (alter current-sys-ref #(remove-component %1 current-entity current-type))))
-  ([type] (dosync (alter current-sys-ref #(remove-component %1 current-entity type))))
-  ([entity type] (dosync (alter current-sys-ref #(remove-component %1 entity type))))
-  ([system entity type]
-   (let [system (transient system)
-         entity-components (:entity-components system)
-         entity-component-types (:entity-component-types system)]
-     (-> system
+  "Remove a component instance from the world and returns it."
+  ([] (dosync (alter current-world-ref #(remove-component %1 current-entity current-type))))
+  ([type] (dosync (alter current-world-ref #(remove-component %1 current-entity type))))
+  ([entity type] (dosync (alter current-world-ref #(remove-component %1 entity type))))
+  ([world entity type]
+   (let [world (transient world)
+         entity-components (:entity-components world)
+         entity-component-types (:entity-component-types world)]
+     (-> world
          (assoc! :entity-components (assoc entity-components type (-> entity-components (get type) (dissoc entity))))
          (assoc! :entity-component-types (assoc entity-component-types entity (-> entity-component-types (get entity) (disj type))))
          persistent!))))
 
 (defn add-system
-  "Adds a new system function to the system. System functions take a system and
-  a time delta and return a new system. See `iterating-system` and
-  `mapping-system` for more help making more nuanced system functions."
-  [system fun]
-  (assoc system :system-fns (conj (:system-fns system) fun)))
+  "Adds a new system to the world. System functions take a world and a time delta
+  and return a new world. See `iterating-system` and `mapping-system` for more
+  help making more nuanced system functions."
+  [world fun]
+  (assoc world :system-fns (conj (:system-fns world) fun)))
 
 (defn get-all-entities-with-component
   "Returns all entities (by ID) with a specific component attached."
-  [system type]
-  (or (-> system :entity-components (get type) keys) []))
+  [world type]
+  (or (-> world :entity-components (get type) keys) []))
 
 (defn add-iterating-system
-  "Adds a new iterating system function to the system. See `iterating-system`."
-  [system type fun]
-  (add-system system (iterating-system type fun)))
+  "Adds a new iterating system function to the world. See `iterating-system`."
+  [world type fun]
+  (add-system world (iterating-system type fun)))
 
 (defn process-tick
   "Executes all system functions in sequence with the supplied delta, and returns
-  the resulting system. If a system returns nil, it throws a
+  the resulting world. If a system returns nil, it throws a
   `java.lang.AssertionError`."
-  [system delta]
+  [world delta]
   (reduce (fn [sys sys-fn] (util/not-nil! (sys-fn sys delta)
                                           "System function returned nil"))
-          system (:system-fns system)))
+          world (:system-fns world)))
 
-(defmacro with-system-context
-  "Execute the body with the current system, entity, and type bound. The system
-  should be a `ref` to the system. Binds the values to the dynamic vars
-  `current-sys-ref`, `current-entity`, and `current-type`. With these vars bound
+(defmacro with-world-context
+  "Execute the body with the current world, entity, and type bound. The world
+  should be a `ref` to the world. Binds the values to the dynamic vars
+  `current-world-ref`, `current-entity`, and `current-type`. With these vars bound
   many ECS functions which normally take these values can leave them out of the
-  parameters. These functions use `dosync` and `alter` to update the system ref
-  with their changes."
-  [sys-ref entity type & body]
-  `(binding [current-sys-ref ~sys-ref
+  parameters. These functions use `dosync` and `alter` to update the world ref
+  with their changes. This is used automatically in `iterating-system`, but can
+  also be used to enable the shorthand functions in your own systems."
+  [world-ref entity type & body]
+  `(binding [current-world-ref ~world-ref
             current-entity ~entity
             current-type ~type]
     ~@body))
@@ -185,57 +189,58 @@
 (defn iterating-system
   "Creates a system function from another function. When the system is invoked,
   fun gets invoked for every entity that has a component of the specified type.
-  When fun is invoked, `with-system-context` is used to bind the current system,
-  entity, and type, allowing for the shortened versions of system functions to be
+  When fun is invoked, `with-world-context` is used to bind the current world,
+  entity, and type, allowing for the shortened versions of world functions to be
   used."
   [type fun]
-  (fn [system delta]
-    (let [sys-ref (ref system)]
-      (doseq [entity (get-all-entities-with-component system type)]
+  (fn [world delta]
+    (let [world-ref (ref world)]
+      (doseq [entity (get-all-entities-with-component world type)]
         (let [local-entity entity
               local-type   type]
-          (with-system-context sys-ref entity type
+          (with-world-context world-ref entity type
             (fun entity))))
-      @sys-ref)))
+      @world-ref)))
 
 (defn mapping-system
   "System mapping strictly over a single component. Function takes
   (fun component) or (fun component delta)."
   [type fun]
-  (fn [system delta]
+  (fn [world delta]
     (let [adapted-fun (util/make-flexible-fn fun)]
       (reduce
-       (fn [system entity]
-         (update-component system entity type adapted-fun delta))
-       system
-       (get-all-entities-with-component system type)))))
+       (fn [world entity]
+         (update-component world entity type adapted-fun delta))
+       world
+       (get-all-entities-with-component world type)))))
 
 (defn add-singleton-ref
-  "Adds a singleton entity that executes an iterating system function. Internal
-  data defaults to an empty map. Returns `[system entity]`, where `entity` is
+  "Adds a singleton entity that executes an `iterating-system` function. Internal
+  data defaults to an empty map. Returns `[world entity]`, where `entity` is
   the ID of the singleton."
-  ([system fun] (add-singleton-ref system {} fun))
-  ([system data fun] (add-singleton-ref system (gensym) data fun))
-  ([system type data fun]
+  ([world fun] (add-singleton-ref world {} fun))
+  ([world data fun] (add-singleton-ref world (gensym) data fun))
+  ([world type data fun]
    (let [entity    (create-entity)
          component data
-         system    (-> system
+         world    (-> world
                        (add-entity entity)
                        (add-component entity type component)
                        (add-iterating-system type fun))]
-     [system entity])))
+     [world entity])))
 
 (defn add-singleton
   "Adds a singleton entity that executes an iterating system function. Internal
   data defaults to an empty map. Returns the new system."
-  ([system fun] (add-singleton system {} fun))
-  ([system data fun] (add-singleton system (gensym) data fun))
-  ([system type data fun]
-   (let [[system entity] (add-singleton-ref system type data fun)]
-     system)))
+  ([world fun] (add-singleton world {} fun))
+  ([world data fun] (add-singleton world (gensym) data fun))
+  ([world type data fun]
+   (let [[world entity] (add-singleton-ref world type data fun)]
+     world)))
 
 (defn get-all-entities
-  "Returns a list of all the entities. Not that useful in application, but good for debugging/testing"
+  "Returns a list of all the entities. Not that useful in application, but good
+  for debugging/testing."
   [system]
   (if-let [result (-> system :entity-component-types keys)]
     result
@@ -256,6 +261,7 @@
     system))
 
 (defn add-throttled-system-fn
-  "Same as `add-system-fn`, but will only execute the `system-fn` after `threshold` milliseconds has been equalled or passed."
+  "Same as `add-system-fn`, but will only execute the `system-fn` after
+  `threshold` milliseconds has been equalled or passed."
   [system system-fn threshold]
   (add-system system (partial throttled-fn system-fn (atom 0) threshold)))

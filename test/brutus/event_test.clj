@@ -5,7 +5,7 @@
 
 (t/deftest event-system
   (t/testing "the event system"
-    (let [sys (-> (ecs/create-system) (event/add-event-system) ref)]
+    (let [sys (-> (ecs/create-world) (event/add-event-system) ref)]
       (t/is (= [] (event/drain-events sys)))
       (t/is (= [] (event/drain-events @sys)))
       (event/add-event sys :event1)

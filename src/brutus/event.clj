@@ -9,23 +9,23 @@
 (extend-type clojure.lang.Agent Ireference? (reference? [this] true))
 
 (defn ^:private get-event-atom
-  [system]
-  (:events (if (reference? system) @system system)))
+  [world]
+  (:events (if (reference? world) @world world)))
 
 (defn add-event-system
-  [system]
-  (assoc system :events (atom [])))
+  [world]
+  (assoc world :events (atom [])))
 
 (defn drain-events
-  [system]
-  (let [[old-events _] (reset-vals! (get-event-atom system) [])]
+  [world]
+  (let [[old-events _] (reset-vals! (get-event-atom world) [])]
     old-events))
 
 (defn add-event-internal
-  [system event]
-  (swap! (get-event-atom system) conj event))
+  [world event]
+  (swap! (get-event-atom world) conj event))
 
 (defn add-event
-  ([event] (add-event ecs/current-sys-ref event))
-  ([system event]
-   (add-event-internal system event)))
+  ([event] (add-event ecs/current-world-ref event))
+  ([world event]
+   (add-event-internal world event)))
