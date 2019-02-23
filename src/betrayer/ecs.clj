@@ -1,4 +1,4 @@
-(ns brutus.ecs
+(ns betrayer.ecs
   "Functions for creating and modifying ECS worlds.
 
   Note that `ecs/current-sys-ref`, `ecs/current-entity`, and `ecs/current-type`
@@ -12,7 +12,7 @@
   for more nuanced system options.
   "
   (:require
-   [brutus.util :as util]
+   [betrayer.util :as util]
    [clojure.math.numeric-tower :as m]
    ))
 

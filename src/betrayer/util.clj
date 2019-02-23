@@ -1,4 +1,4 @@
-(ns brutus.util
+(ns betrayer.util
   "Theoretically reusable utility functions."
   )
 

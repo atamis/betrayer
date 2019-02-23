@@ -1,7 +1,7 @@
-(ns brutus.ecs-test
-  (:require [brutus.ecs :as ecs]
+(ns betrayer.ecs-test
+  (:require [betrayer.ecs :as ecs]
             [clojure.test :as t]
-            [brutus.event :as event]
+            [betrayer.event :as event]
             [clojure.set :as set]
             ))
 

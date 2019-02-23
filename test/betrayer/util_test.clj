@@ -1,6 +1,6 @@
-(ns brutus.util-test
+(ns betrayer.util-test
   (:require  [clojure.test :as t]
-             [brutus.util :as util]))
+             [betrayer.util :as util]))
 
 (t/deftest util
   (t/testing "arity-first"

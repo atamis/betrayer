@@ -1,5 +1,5 @@
-(ns brutus.event
-  (:require [brutus.ecs :as ecs]))
+(ns betrayer.event
+  (:require [betrayer.ecs :as ecs]))
 
 (defprotocol Ireference? (reference? [this]))
 

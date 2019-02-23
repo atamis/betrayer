@@ -1,4 +1,6 @@
-# Brute
+# Betrayer
+
+**TODO**: fix README.
 
 A simple and lightweight Entity Component System library for writing games with Clojure or ClojureScript.
 

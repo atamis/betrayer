@@ -1,7 +1,7 @@
-(ns brutus.event-test
-  (:require [brutus.event :as event]
+(ns betrayer.event-test
+  (:require [betrayer.event :as event]
             [clojure.test :as t]
-            [brutus.ecs :as ecs]))
+            [betrayer.ecs :as ecs]))
 
 (t/deftest event-system
   (t/testing "the event system"
