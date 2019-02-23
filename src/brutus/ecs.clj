@@ -6,7 +6,9 @@
   vars are used in several functions to elide parameters. See
   `with-system-context` for more information."
   (:require
-   [brutus.util :as util]))
+   [brutus.util :as util]
+   [clojure.math.numeric-tower :as m]
+   ))
 
 ;; TODO: rename system to world?
 
@@ -238,3 +240,22 @@
   (if-let [result (-> system :entity-component-types keys)]
     result
     []))
+
+;; TODO: test throttled functions
+;; TODO: refactor this into a wrapping function.
+
+(defn ^:private throttled-fn
+  "The function that does the actual throttling."
+  [system-fn atom threshhold system delta]
+  (swap! atom + delta)
+  (if (>= @atom threshhold)
+    (reduce (fn [v _]                       ;; this takes care of when the framerate
+              (swap! atom - threshhold)     ;; is WAY slower than the throttle.
+              (system-fn v delta))
+            system (-> @atom (/ threshhold) m/floor range))
+    system))
+
+(defn add-throttled-system-fn
+  "Same as `add-system-fn`, but will only execute the `system-fn` after `threshold` milliseconds has been equalled or passed."
+  [system system-fn threshold]
+  (add-system system (partial throttled-fn system-fn (atom 0) threshold)))
