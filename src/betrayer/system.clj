@@ -1,6 +1,7 @@
 (ns betrayer.system
   (:require [betrayer.ecs :refer :all]
             [betrayer.util :as util]
+            [betrayer.dynamic :as dynamic]
             [clojure.math.numeric-tower :as m]
             ))
 
@@ -16,7 +17,7 @@
       (doseq [entity (get-all-entities-with-component world type)]
         (let [local-entity entity
               local-type   type]
-          (with-world-context world-ref entity type
+          (dynamic/with-world-context world-ref entity type
             (fun entity))))
       @world-ref)))
 

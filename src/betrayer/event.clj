@@ -1,5 +1,6 @@
 (ns betrayer.event
-  (:require [betrayer.ecs :as ecs]))
+  (:require [betrayer.ecs :as ecs]
+            [betrayer.dynamic :as dynamic]))
 
 (defprotocol Ireference? (reference? [this]))
 
@@ -26,6 +27,6 @@
   (swap! (get-event-atom world) conj event))
 
 (defn add-event
-  ([event] (add-event ecs/current-world-ref event))
+  ([event] (add-event dynamic/current-world-ref event))
   ([world event]
    (add-event-internal world event)))

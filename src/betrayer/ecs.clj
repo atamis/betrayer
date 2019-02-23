@@ -1,10 +1,10 @@
 (ns betrayer.ecs
   "Functions for creating and modifying ECS worlds.
 
-  Note that `ecs/current-sys-ref`, `ecs/current-entity`, and `ecs/current-type`
-  are dynamic vars that can be set with `with-world-context`. These dynamic
-  vars are used in several functions to elide parameters. See
-  `with-world-context` for more information.
+  Note that `dynamic/current-sys-ref`, `dynamic/current-entity`, and
+  `dynamic/current-type`are dynamic vars that can be set with
+  `dynamic/with-world-context`. These dynamic vars are used in several functions
+  to elide parameters. See `dynamic` for more information.
 
   Worlds consist of entities with components attached to them, where components
   are tags (typically symbols) with attached data. Systems are functions which
@@ -12,7 +12,8 @@
   `system/iterating-system`for more nuanced system options.
   "
   (:require
-   [betrayer.util :as util]))
+   [betrayer.util :as util]
+   [betrayer.dynamic :refer :all]))
 
 (defn create-world
   "Creates an empty world."
@@ -47,16 +48,6 @@
   "Generate a new random ID. See `create-uuid` and `Java.util.UUID/randomUUID`."
   []
   (create-uuid))
-
-(def ^:dynamic current-world-ref
-  "Dynamic var representing the current world reference."
-  nil)
-(def ^:dynamic current-entity
-  "Dynamic var representing the current entity UUID."
-  nil)
-(def ^:dynamic current-type
-  "Dynamic var representing the current component type."
-  nil)
 
 (defn get-component
   "Get the component from an entity in the world with this type."
@@ -162,20 +153,6 @@
   (reduce (fn [sys sys-fn] (util/not-nil! (sys-fn sys delta)
                                           "System function returned nil"))
           world (:system-fns world)))
-
-(defmacro with-world-context
-  "Execute the body with the current world, entity, and type bound. The world
-  should be a `ref` to the world. Binds the values to the dynamic vars
-  `current-world-ref`, `current-entity`, and `current-type`. With these vars bound
-  many ECS functions which normally take these values can leave them out of the
-  parameters. These functions use `dosync` and `alter` to update the world ref
-  with their changes. This is used automatically in `iterating-system`, but can
-  also be used to enable the shorthand functions in your own systems."
-  [world-ref entity type & body]
-  `(binding [current-world-ref ~world-ref
-             current-entity ~entity
-             current-type ~type]
-     ~@body))
 
 (defn get-all-entities
   "Returns a list of all the entities. Not that useful in application, but good
