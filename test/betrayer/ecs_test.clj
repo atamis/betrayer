@@ -3,6 +3,7 @@
             [clojure.test :as t]
             [betrayer.event :as event]
             [clojure.set :as set]
+            [betrayer.system :as system]
             ))
 
 (def ^:dynamic sys nil)
@@ -20,7 +21,7 @@
 
 (defn simple-add-system
   [system type data fun]
-  (into [] (reverse (ecs/add-singleton-ref system type data fun))))
+  (into [] (reverse (system/add-singleton-ref system type data fun))))
 
 (t/deftest iterating-system
   (defn setup-ticking-system
@@ -124,8 +125,8 @@
     (def system (-> @sys
                     (ecs/add-entity entity)
                     (ecs/add-component entity :tick {:n 0 :m 0})
-                    (ecs/add-system (ecs/mapping-system :tick #(update %1 :n inc)))
-                    (ecs/add-system (ecs/mapping-system :tick (fn [component delta] (update component :m #(+ delta %1)))))
+                    (ecs/add-system (system/mapping-system :tick #(update %1 :n inc)))
+                    (ecs/add-system (system/mapping-system :tick (fn [component delta] (update component :m #(+ delta %1)))))
                     ))
     (t/is (= 0 (:n (ecs/get-component system entity :tick))))
     (t/is (= 0 (:m (ecs/get-component system entity :tick))))
@@ -133,6 +134,25 @@
     (def system (ecs/process-tick system 2))
     (t/is (= 1 (:n (ecs/get-component system entity :tick))))
     (t/is (= 2 (:m (ecs/get-component system entity
+                                      :tick)))))
+  (t/testing "throttled-system"
+    (def counter (atom 0))
+    (def world (-> (ecs/create-world)
+                   (ecs/add-system
+                    (system/throttled-system
+                     10
+                     (fn [system delta] (swap! counter + delta) system)))))
 
-                                      :tick))))))
+    (def world (ecs/process-tick world 1))
+    (t/is (= 0 @counter))
+    (def world (ecs/process-tick world 1))
+    (t/is (= 0 @counter))
+    (def world (ecs/process-tick world 8))
+    (t/is (= 10 @counter))
+    (def world (ecs/process-tick world 10))
+    (def world (ecs/process-tick world 10))
+    (t/is (= 30 @counter))
+    )
+  )
+
 
