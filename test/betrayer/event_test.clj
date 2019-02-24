@@ -30,7 +30,6 @@
                    (system/add-iterating-system
                     :rebroadcast
                     (fn [entity]
-                      (prn (ecs/get-component :subscription))
                       (event/add-event [:topic2 (:topic (ecs/get-component :subscription))])
                       (event/add-event [:topic3 (event/get-events :topic)])
                       )
@@ -38,9 +37,7 @@
                    ))
     (def world (event/subscribe world entity :topic))
     (event/add-event world [:topic 1])
-    (prn world)
     (def world (ecs/process-tick world 1))
-    (prn world)
     (t/is (= [[:topic2 [[:topic 1]]] [:topic3 [[:topic 1]]]] (event/drain-events world)))
     )
   )

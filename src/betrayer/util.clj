@@ -1,8 +1,9 @@
 (ns betrayer.util
-  "Theoretically reusable utility functions."
-  )
+  "Theoretically reusable utility functions.")
 
 ; The array of methods returned by .getDeclaredMethods seems always sorted.
+
+
 (defn arity-min
   "Return the smallest arity a function can be invoked with."
   [fun]
@@ -48,10 +49,16 @@
   `java.lang.AssertionError` if it is, with an optional message. See `assert` for
   more info."
   ([x]
-   (not-nil! x "Expected not nil, got nil")
-   )
+   (not-nil! x "Expected not nil, got nil"))
   ([x msg]
    (assert (some? x) msg)
-   x
-   )
-  )
+   x))
+
+(defprotocol IReference? (reference? [this]))
+
+(extend-type java.lang.Object IReference? (reference? [this] false))
+(extend-type nil IReference? (reference? [this] false))
+(extend-type clojure.lang.Ref IReference? (reference? [this] true))
+(extend-type clojure.lang.Agent IReference? (reference? [this] true))
+(extend-type clojure.lang.Atom IReference? (reference? [this] true))
+

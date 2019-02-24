@@ -57,4 +57,14 @@
     (t/is (thrown? java.lang.AssertionError (util/not-nil! nil "Was nil")))
 
     )
+
+  (t/testing "reference?"
+    (t/is (util/reference? (ref 0)))
+    (t/is (util/reference? (atom 0)))
+    (t/is (util/reference? (agent 0)))
+    (t/is (not (util/reference? true)))
+    (t/is (not (util/reference? false)))
+    (t/is (not (util/reference? [])))
+    (t/is (not (util/reference? {})))
+    )
   )

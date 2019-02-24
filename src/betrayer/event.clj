@@ -1,18 +1,12 @@
 (ns betrayer.event
   (:require [betrayer.ecs :as ecs]
             [betrayer.dynamic :as dynamic]
-            [betrayer.system :as system]))
-
-(defprotocol Ireference? (reference? [this]))
-
-(extend-type java.lang.Object Ireference? (reference? [this] false))
-(extend-type nil Ireference? (reference? [this] false))
-(extend-type clojure.lang.Ref Ireference? (reference? [this] true))
-(extend-type clojure.lang.Agent Ireference? (reference? [this] true))
+            [betrayer.system :as system]
+            [betrayer.util :as util]))
 
 (defn ^:private get-event-atom
   [world]
-  (:events (if (reference? world) @world world)))
+  (:events (if (util/reference? world) @world world)))
 
 (defn drain-events
   [world]

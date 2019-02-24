@@ -50,16 +50,16 @@
                          (let [component (ecs/get-component :tick-event)
                                old-n (:n component)
                                new-component (update component :n inc)]
-                           (event/add-event old-n)
+                           (event/add-event [:topic, old-n])
                            (ecs/add-component new-component)))))
 
   (t/testing "adding events"
     (let [[entity sys] (setup-event-system @sys)]
       (t/is (= [] @(:events sys)))
       (def new-sys (ecs/process-tick sys 1))
-      (t/is (= [0] @(:events sys)))
+      (t/is (= [0] (map second @(:events sys))))
       (def new-sys (ecs/process-tick new-sys 1))
-      (t/is (= [0 1] (event/drain-events sys)))))
+      (t/is (= [1] (map second (event/drain-events sys))))))
 
   (defn setup-entity-spawner
     [system]
@@ -69,7 +69,7 @@
                                old-n (:n component)
                                new-component (update component :n inc)
                                new-entity (ecs/add-entity!)]
-                           (event/add-event new-entity)
+                           (event/add-event [:topic new-entity])
                            (ecs/add-component new-entity :dummy :dummy)
                            (ecs/add-component new-component)))))
 
@@ -84,8 +84,8 @@
       (t/is (= {:n 1} (ecs/get-component new-sys entity :entity-spawner)))
 
       ; Check the first spawned entity
-      (def events (event/drain-events new-sys))
-      (def new-entity (events 0))
+      (def events (map second (event/drain-events new-sys)))
+      (def new-entity (nth events 0))
 
       ; And that it has the component
       (t/is (= events (ecs/get-all-entities-with-component new-sys :dummy)))
@@ -94,7 +94,7 @@
       (def new-sys (ecs/process-tick new-sys 1))
       (def new-sys (ecs/process-tick new-sys 1))
       (def new-sys (ecs/process-tick new-sys 1))
-      (def dummy-entities (conj (event/drain-events new-sys) new-entity))
+      (def dummy-entities (conj (map second (event/drain-events new-sys)) new-entity))
 
       (t/is (same-elements dummy-entities (ecs/get-all-entities-with-component new-sys :dummy)))))
 
