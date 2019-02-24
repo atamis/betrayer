@@ -138,7 +138,7 @@
   and return a new world. See `system/iterating-system` and
   `system/mapping-system` for more help making more nuanced system functions."
   [world fun]
-  (assoc world :system-fns (conj (:system-fns world) fun)))
+  (assoc world :system-fns (conj (or (:system-fns world) []) fun)))
 
 (defn get-all-entities-with-component
   "Returns all entities (by ID) with a specific component attached."
