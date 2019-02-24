@@ -54,7 +54,9 @@
    (assert (some? x) msg)
    x))
 
-(defprotocol IReference? (reference? [this]))
+(defprotocol IReference?
+  "Whether or not this is derefable (not complete, handles refs, agents, and atoms.)"
+  (reference? [this]))
 
 (extend-type java.lang.Object IReference? (reference? [this] false))
 (extend-type nil IReference? (reference? [this] false))
