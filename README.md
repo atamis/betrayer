@@ -1,177 +1,148 @@
 # Betrayer
 
-**TODO**: fix README.
+This is a simple and lightweight ECS framework in Clojure. It is a fork of
+markmandel's [brute](https://github.com/markmandel/brute), so I had the genius
+idea of naming my fork "brutus", but _someone already had that idea_, so this
+library is "betrayer".
 
-A simple and lightweight Entity Component System library for writing games with Clojure or ClojureScript.
+![Clojars Version](https://clojars.org/betrayer/latest-version.svg?v=2)
 
-![Clojars Version](https://clojars.org/brute/latest-version.svg?v=2)
+You may find [Entity Systems Wiki](http://entity-systems.wikidot.com/) and
+[Adam Martin's Blog Post
+series](http://t-machine.org/index.php/2007/09/03/entity-systems-are-the-future-of-mmog-development-part-1/)
+useful for understanding ECS frameworks.
 
-[![wercker status](https://app.wercker.com/status/5f5d692036ee110c41a50ccc7b6f4ae5/m "wercker status")](https://app.wercker.com/project/bykey/5f5d692036ee110c41a50ccc7b6f4ae5)
+# Concepts and Types
 
-The aim of this project was to use basic Clojure building blocks to form an Entity System architecture, and get out of the
-author's way when deciding exactly what approach would best fit their game when integrating with this library.
+The primary data structure of Betrayer is the `world`, which contains entities,
+components, and systems.
 
-To that end:
+* __Entities__ are uniquely identified objects in the world. Betrayer uses UUIDs
+  as unique identifiers. Entities have no inherent data.
+* __Components__ are attached to entities and can have data. They are identified
+  by a tag, and tags are unique on an entity.
+* __Systems__ are functions which take a world and a time delta and return an
+  updated world. Systems use component tags to identify relevant entities,
+  modify those component's data, add new components, and new entities.
+  
+  
+Entities are UUIDs, components are normal Clojure data identified by keywords,
+and systems are normal functions.
 
-- Entities are UUIDs.
-- The Component type system can be easily extended through a multimethod `get-component-type`, but defaults to using the component's instance class as its type.
-- Components can therefore be defrecords or deftypes by default, but could easily be maps or just about anything else.
-- Systems are simply references to functions of the format `(fn [delta])`.
+# Usage
 
-To learn more about Entity Component Systems, please read the [Entity Systems Wiki](http://entity-systems.wikidot.com/).
-I personally, also found [Adam Martin's Blog Post series](http://t-machine.org/index.php/2007/09/03/entity-systems-are-the-future-of-mmog-development-part-1/)
-very useful at giving a step by step explanation of Entity System architecture.
+Betrayer has several namespaces
 
-## News
+* __betrayer.ecs__ contains functions for manipulating primary world data
+  elements, like entities and components.
+* __betrayer.system__ contains helper functions for writing system functions in
+  different modes.
+* __betrayer.event__ contains functions for subscribing and publishing events.
+* __betrayer.dynamic__ contains vars and macros enabling easier world
+  manipulation.
+* __betrayer.util__ contains utility functions.
 
-Blog posts and news can be found on the [Compound Theory Blog](http://www.compoundtheory.com/category/brute)
+## Entities and Components
 
-## Usage
+You can create a new empty world with `ecs/create-world`. With
+`ecs/create-entity`, you can create a new unique identifier, and with
+`ecs/add-entity`, you can register it with the world. You can add components to
+an entity with the `ecs/add-component` function, which takes a world, an entity,
+a component tag, and component data. You can query component data with
+`ecs/get-component`, which returns nil if the component isn't found. You can
+also remove components with `ecs/remove-component`, and kill entities with
+`ecs/kill-entity`.
 
-See the [Library API](https://markmandel.github.io/brute/codox/) for all the functionality of this library.
+See documentation (`lein codox`) for specific parameters. By default, these
+functions take a world and return a world.
 
-### Quick Start
+You can also query the system en masse with `ecs/get-all-entities` and
+`ecs/get-all-entities-with-component`, allowing system functions to operate over
+entities tagged with components, rather than the code being attached to
+components directly.
 
-A quick example based overview of what functionality Brute provides.
+You can also register a new systme function with `ecs/add-system`, and execute
+all systems in order with `ecs/process-tick`, which also takes a time delta.
 
-I've used fully qualified namespace, *brute.entity* and *brute.system* to be explicit about what is part of Brute in the demo code below, and what denotes custom code.
+## Dynamic Mode
 
-#### Creating the Basic Entity Component System
+Although maintaining functional purity is useful, it is frequently much more
+convenient to see the ECS world less as a single piece of data and more like a
+database. In particular, it can be very useful for the world to have an
+"identity", in Clojure terms, even when it doesn't have one in the broader
+program. Particularly when writing systems, the identity of the world the system
+is operating is of paramount importance. Additionally, the identity of the
+entity and component you're working on is also really important.
 
-Brute doesn't store any data in a ref/atom, but instead provides you with the functions and capabilities for manipulating an immutable data structure that represents this ES system.  This is particularly useful because:
+By default, when modifying the world with standard `ecs` functions, you have to
+specify the world, the entity ID, and the component type in many cases, which
+can get cumbersome when working on a single component in the same world.
 
-- How the entity data structure is persisted is up to you and the library you are using (although 9/10 times I expect it will end up stored in a single atom, and reset! on each game loop), which gives you complete control over when state mutation occurs – if it occurs at all. This makes concurrent processes much simpler to develop.
-- You get direct access to the ES data structure, in case you want to do something with it that isn’t exposed in the current API.
-- You can easily have multiple ES systems within a single game, e.g. for sub-games.
-- Saving a game becomes simple: Just serialise the ES data structure and store. Deserialise to load.
-- Basically all the good stuff having immutable data structures and pure functions should give you.
+So, the `dynamic` namespace offers several dynamic vars, and a macro to bind
+them, to represent the current world, entity and component type. The entity and
+component type are just data, but the world is a `ref`. `ecs` function are
+written such that, if these vars are bound, you can (but don't have to) elide
+that data from the function calls, and will update current world ref if a world
+isn't specified. You can then use these functions to query, insert, and update
+the world as though it were a database rather than simple value.
 
-To create the initial system data structure:
+## Systems
 
-```clojure
-(brute.entity/create-system)
-```
+By default, systems are functions that take a world and a delta and return a new
+world. This is fine for simple systems, but when attempting to implement
+slightly more complex behaviors (like updating all components with a particular
+tag) it quickly gets cumbersome and boilerplate heavy. So, `betrayer/system` has
+some functions to make common system functions easier.
 
-This is actually a map, that lets you access Entities and their Components from a variety of ways, so you can always do it in a performant way.
+`iterating-system` iterates over all the components of a particular type,
+passing the entity ID to the function. It also enables dynamic mode, making it
+easy to update both the current component but also other components on that
+entity.
 
-```clojure
-    {;; Nested Map of Component Types -> Entity -> Component Instance
-        :entity-components      {}
-     ;; Map of Entities -> Set of Component Types
-        :entity-component-types {}}
-```
+`mapping-system` maps over all the components of a particular type, applying the
+function to their data, and updating the component with the return value. It
+doesn't enable dynamic mode, and is intended for very simple components that
+just need to update in response to game ticks or time deltas, or are updated by
+other more complex systems.
 
-Do note, that this data structure may be subject to change between releases.
+`add-singleton` adds a single entity, and a single component with a unique tag,
+and adds an `iterating-system` over that unique tag, giving you a function
+operating in dynamic mode with its own data store in the component.
 
-#### Creating a Ball Entity, with corresponding Component instances.
+`throttled-system` takes a threshold and will only execute the system function
+after that much time has elapsed, but otherwise works like a normal system
+function.
 
-- A `Ball` component instance to know it is a Ball.
-- A `Rectangle` component instance to draw a rectangle in its' place
-- A `Velocity` component instance to know what direction it is travelling in, and how fast.
+# Examples
 
-```clojure
-(defn create-ball
-    "Creates a ball entity"
-    [system]
-    (let [ball (brute.entity/create-entity) ;; Returns a UUID for the Entity
-          center-x (-> (graphics! :get-width) (/ 2) (m/round))
-          center-y (-> (graphics! :get-height) (/ 2) (m/round))
-          ball-size 20
-          ball-center-x (- center-x (/ ball-size 2))
-          ball-center-y (- center-y (/ ball-size 2))
-          angle (create-random-angle)]
-        (-> system
-            (brute.entity/add-entity ball) ;; Adds the entity to the ES data structure and returns it
-            (brute.entity/add-component ball (c/->Ball)) ;; Adds the Ball instance to the ES data structure and returns it
-            (brute.entity/add-component ball (c/->Rectangle (rectangle ball-center-x ball-center-y ball-size ball-size) (color :white))) ;; Adds the Rectangle instance to the ES data structure and returns it
-            (brute.entity/add-component ball (c/->Velocity (vector-2 0 300 :set-angle angle)))))) ;; Adds the Velocity instance to the ES data structure and returns it
-```
+Examples coming soon. See `tests/betrayer/ecs_test.clj` for simple examples.
 
-#### Render each of the Entities that have a Rectangle Component
+# Documentation
 
-```clojure
-(defn- render-rectangles
-    "Render all the rectangles"
-    [system]
-    (let [shape-renderer (:shape-renderer (:renderer system))]
-        (.begin shape-renderer ShapeRenderer$ShapeType/Filled)
-        (doseq [entity (brute.entity/get-all-entities-with-component system Rectangle)] ;; loop around all the entities that have a Rectangle Component instance
-            (let [rect (brute.entity/get-component system entity Rectangle) ;; get the Rectangle Component Instance for this entity
-                  geom (:rect rect)] ;; Rectangle component contains a Rectangle geometry shape.
-                (doto shape-renderer ;; Draw the actual rectangle on the screen
-                    (.setColor (:colour rect)) ;; Rectangle component contains the colour
-                    (.rect (rectangle! geom :get-x)
-                           (rectangle! geom :get-y)
-                           (rectangle! geom :get-width)
-                           (rectangle! geom :get-height)))))
-        (.end shape-renderer)))
-```
+Documentation can be generated with `lein codox`.
 
-#### Systems Management
-System management is an optional feature for you to use with Brute.
+# Differences
 
-The following adds each system function to a list contains on the Entity System data structure, maintaining the order in which they were added.
+Betrayer differs from the original Brute library in 2 major and a few minor
+ways. The major way it differs is in components. Brute has the concept of
+component types or tags, but hides them from the user, suggesting that the class
+of the component data be the tag, and that components should be `defrecord`s or
+similar. This is implemented with a multimethod. Betrayer elevates the component
+tag to a first class value specified by the user, and assumes you will use plain
+Clojure data structures for the component data, if necessary. This is primarily
+a conceptual change. In terms of code, it was a comparatively simple change.
 
-```clojure
-(defn- create-systems
-    "register all the system functions"
-    [system]
-    (-> system
-    	(brute.system/add-system-fn input/process-one-game-tick)
-    	(brute.system/add-system-fn scoring/process-one-game-tick)
-    	(brute.system/add-system-fn ai/process-one-game-tick)
-    	(brute.system/add-system-fn physics/process-one-game-tick)
-    	(brute.system/add-system-fn rendering/process-one-game-tick)))
-```
+The other major change is the introduction of dynamic mode, to make programming
+complex systems easier. This is an optional mode that did require many code
+changes.
 
-Finally call each function in the order added, simply write:
-
-```clojure
-(brute.system/process-one-game-tick system (graphics! :get-delta-time))
-```
+The minor changes are some minor QoL changes, the helper functions in
+`betrayer.system`, and the event system in `betrayer.event`.
 
 
+# License
 
-## Game Examples
-
-- [Pong Clone](https://github.com/markmandel/brute-play-pong) written with [play-clj](https://github.com/oakes/play-clj)
-
-## Contributing
-
-Pull requests are always welcome!
-
-Active development happens on the `develop` branch. The `master` branch is the source for the current release.
-
-### CLJX
-This project uses [CLJX](https://github.com/lynaghk/cljx) to cross compile to Clojure and ClojureScript.  For that reason, you will want to run `lein cljx` before starting up a REPL, otherwise the REPL won't be able to find the user.clj dependencies.
-
-If you want to use [Midje autotest](https://github.com/marick/Midje/wiki/Autotest), you will want to run `lein cljx auto` to automatically generate the Clojure files so that Midje can see the changes.
-
-### ClojureScript
-
-To run the tests under ClojureScript you will need the following Node pages installed:
-
-```bash
-npm install -g karma karma-cli karma-jasmine jasmine-node
-```
-
-To run the CLJS tests in isolation you can run:
-
-```bash
-lein cljsbuild test karma
-```
-
-### Clean Test
-
-To do a clean end to end test of both the Clojure and ClojureScript code:
-
-```bash
-lein cleantest
-```
-
-## License
-
-Copyright © 2014 Mark Mandel
+Copyright © 2019 Andrew Amis
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
