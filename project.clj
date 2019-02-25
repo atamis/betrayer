@@ -9,4 +9,6 @@
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}}
   :plugins [[lein-codox "0.10.6"]]
+  :deploy-repositories [["releases" {:url "https://clojars.org/repo"
+                                     :creds :gpg}]]
   )
