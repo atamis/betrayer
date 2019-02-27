@@ -199,3 +199,19 @@
     result
     []))
 
+(defn get-all-components
+  "Get all the components attached to an entity. This is fairly slow, and should
+  be used sparingly."
+  ([]
+   (get-all-components @current-world-ref current-entity)
+   )
+  ([entity]
+   (get-all-components @current-world-ref entity)
+   )
+  ([world entity]
+   (->> (get-in world [:entity-component-types entity])
+        (map (fn [type] [type (get-component world entity type)]))
+        (into {})
+       )
+   )
+  )

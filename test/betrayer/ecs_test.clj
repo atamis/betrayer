@@ -134,36 +134,18 @@
       (t/is (not (some? ((:entity-component-types new-sys)
                          entity))))))
 
-  (t/testing "mapping systems"
+  (t/testing "get all components"
     (def entity (ecs/create-entity))
-    (def system (-> @sys
-                    (ecs/add-entity entity)
-                    (ecs/add-component entity :tick {:n 0 :m 0})
-                    (ecs/add-system (system/mapping-system :tick #(update %1 :n inc)))
-                    (ecs/add-system (system/mapping-system :tick (fn [component delta] (update component :m #(+ delta %1)))))))
-    (t/is (= 0 (:n (ecs/get-component system entity :tick))))
-    (t/is (= 0 (:m (ecs/get-component system entity :tick))))
-    ; Note delta = 2
-    (def system (ecs/process-tick system 2))
-    (t/is (= 1 (:n (ecs/get-component system entity :tick))))
-    (t/is (= 2 (:m (ecs/get-component system entity
-                                      :tick)))))
-  (t/testing "throttled-system"
-    (def counter (atom 0))
-    (def world (-> (ecs/create-world)
-                   (ecs/add-system
-                    (system/throttled-system
-                     10
-                     (fn [system delta] (swap! counter + delta) system)))))
+    (def new-sys (ecs/add-entity @sys entity))
+    (t/is (= {} (ecs/get-all-components new-sys entity)))
+    (def new-sys (ecs/add-component new-sys entity :test1 true))
+    (t/is (= {:test1 true} (ecs/get-all-components new-sys entity)))
+    (def new-sys (ecs/add-component new-sys entity :test2 :asdf))
+    (t/is (= {:test1 true :test2 :asdf} (ecs/get-all-components new-sys entity)))
+    (def new-sys (ecs/remove-component new-sys entity :test1))
+    (t/is (= {:test2 :asdf} (ecs/get-all-components new-sys entity)))
+    )
 
-    (def world (ecs/process-tick world 1))
-    (t/is (= 0 @counter))
-    (def world (ecs/process-tick world 1))
-    (t/is (= 0 @counter))
-    (def world (ecs/process-tick world 8))
-    (t/is (= 10 @counter))
-    (def world (ecs/process-tick world 10))
-    (def world (ecs/process-tick world 10))
-    (t/is (= 30 @counter))))
+  )
 
 
