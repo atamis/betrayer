@@ -62,7 +62,7 @@
 
 (defn add-entity
   "Add an entity to the world. Also see `add-entity!` for a more useful function."
-  ([entity] (dosync (alter current-world-ref #(add-entity %1 entity))))
+  ([entity] (alter current-world-ref #(add-entity %1 entity)))
   ([world entity]
    (let [world (transient world)]
      (-> world
@@ -75,15 +75,15 @@
   the newly created entity."
   []
   (let [entity (create-entity)]
-    (dosync (alter current-world-ref #(add-entity %1 entity)))
+    (alter current-world-ref #(add-entity %1 entity))
     entity))
 
 (defn add-component
   "Add a component of a specific type to an entity in a world, or updates an
   existing component with new data."
-  ([component] (dosync (alter current-world-ref #(add-component %1 current-entity current-type component))))
-  ([type component] (dosync (alter current-world-ref #(add-component %1 current-entity type component))))
-  ([entity type component] (dosync (alter current-world-ref #(add-component %1 entity type component))))
+  ([component] (alter current-world-ref #(add-component %1 current-entity current-type component)))
+  ([type component] (alter current-world-ref #(add-component %1 current-entity type component)))
+  ([entity type component] (alter current-world-ref #(add-component %1 entity type component)))
   ([world entity type instance]
    (let [world (transient world)
          ecs (:entity-components world)
@@ -99,11 +99,11 @@
   returns nil, the component is not updated. Otherwise, the component data is updated
   with the return value."
   ([fun]
-   (dosync (alter current-world-ref #(update-component %1 current-entity current-type fun))))
+   (alter current-world-ref #(update-component %1 current-entity current-type fun)))
   ([type fun]
-   (dosync (alter current-world-ref #(update-component %1 current-entity type fun))))
+   (alter current-world-ref #(update-component %1 current-entity type fun)))
   ([entity type fun]
-   (dosync (alter current-world-ref #(update-component %1 entity type fun))))
+   (alter current-world-ref #(update-component %1 entity type fun)))
   ([world entity type fun & args]
    (if-let [update (apply fun (get-component world entity type) args)]
      (add-component world entity type update)
@@ -114,29 +114,26 @@
   return `[new-data ret]` and returns `[world ret]`. When the world parameter is
   elided, `dynamic/current-world-ref` is modified, and it returns `ret` instead."
   ([fun]
-   (dosync
     (let [[world ret] (update-in-component
                        @current-world-ref
                        current-entity
                        current-type fun)]
       (ref-set current-world-ref world)
-      ret)))
+      ret))
 
   ([type fun]
-   (dosync
     (let [[world ret] (update-in-component
                        @current-world-ref
                        current-entity
                        type
                        fun)]
       (ref-set current-world-ref world)
-      ret)))
+      ret))
 
   ([entity type fun]
-   (dosync
     (let [[world ret] (update-in-component @current-world-ref entity type fun)]
       (ref-set current-world-ref world)
-      ret)))
+      ret))
 
   ([world entity type fun & args]
    (if-let [[update ret] (apply fun (get-component world entity type) args)]
@@ -145,7 +142,7 @@
 
 (defn kill-entity
   "Removes an entitity and all its components and returns it."
-  ([] (dosync (alter current-world-ref #(kill-entity %1 current-entity))))
+  ([] (alter current-world-ref #(kill-entity %1 current-entity)))
   ([entity] (alter current-world-ref #(kill-entity %1 entity)))
   ([world entity]
    (let [world (transient world)
@@ -161,9 +158,9 @@
 
 (defn remove-component
   "Remove a component instance from the world and returns it."
-  ([] (dosync (alter current-world-ref #(remove-component %1 current-entity current-type))))
-  ([type] (dosync (alter current-world-ref #(remove-component %1 current-entity type))))
-  ([entity type] (dosync (alter current-world-ref #(remove-component %1 entity type))))
+  ([] (alter current-world-ref #(remove-component %1 current-entity current-type)))
+  ([type] (alter current-world-ref #(remove-component %1 current-entity type)))
+  ([entity type] (alter current-world-ref #(remove-component %1 entity type)))
   ([world entity type]
    (let [world (transient world)
          entity-components (:entity-components world)

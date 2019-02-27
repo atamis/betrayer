@@ -1,6 +1,9 @@
 (ns betrayer.dynamic
   "Holds dynamically bound vars used by `betrayer.ecs` to adjust the behavior of
-  its functions to elide extraneous parameters when context can be determined."
+  its functions to elide extraneous parameters when context can be determined.
+  If you are in a dynamic context, it is assumed you are in a `dosync` block,
+  and can alter `current-world-ref` at will.
+  "
   )
 
 (def ^:dynamic current-world-ref
@@ -25,7 +28,8 @@
   `(binding [current-world-ref ~world-ref
              current-entity ~entity
              current-type ~type]
-     ~@body))
+     (dosync
+      ~@body)))
 
 (defmacro with-world-upon-context
   "Like `with-world-context`, but takes an ECS world as a value rather than a

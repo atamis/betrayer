@@ -59,8 +59,8 @@
   "Subscribe an entity to an event topic. Subscribed entities get copies of all
   events on the topics they're subscribed to delivered by the event system
   function. Existing events are replaced rather than added to."
-  ([topic] (dosync (alter dynamic/current-world-ref subscribe dynamic/current-entity topic)))
-  ([entity topic] (dosync (alter dynamic/current-world-ref subscribe entity topic)))
+  ([topic] (alter dynamic/current-world-ref subscribe dynamic/current-entity topic))
+  ([entity topic] (alter dynamic/current-world-ref subscribe entity topic))
   ([world entity topic]
    (ecs/add-component
     world
