@@ -51,6 +51,8 @@
 
 (defn get-component
   "Get the component from an entity in the world with this type."
+  ([]
+   (get-component @current-world-ref current-entity current-type))
   ([type]
    (get-component @current-world-ref current-entity type))
   ([entity type]
@@ -60,8 +62,6 @@
 
 (defn add-entity
   "Add an entity to the world. Also see `add-entity!` for a more useful function."
-  ; TODO: make this not as bad.
-  ([] (dosync (alter current-world-ref #(add-entity %1 (create-entity)))))
   ([entity] (dosync (alter current-world-ref #(add-entity %1 entity))))
   ([world entity]
    (let [world (transient world)]
@@ -98,6 +98,12 @@
   function is passed the component data and any additional args. If the function
   returns nil, the component is not updated. Otherwise, the component data is updated
   with the return value."
+  ([fun]
+   (dosync (alter current-world-ref #(update-component %1 current-entity current-type fun))))
+  ([type fun]
+   (dosync (alter current-world-ref #(update-component %1 current-entity type fun))))
+  ([entity type fun]
+   (dosync (alter current-world-ref #(update-component %1 entity type fun))))
   ([world entity type fun & args]
    (if-let [update (apply fun (get-component world entity type) args)]
      (add-component world entity type update)
@@ -110,9 +116,9 @@
   ([fun]
    (dosync
     (let [[world ret] (update-in-component
-                             @current-world-ref
-                             current-entity
-                             current-type fun)]
+                       @current-world-ref
+                       current-entity
+                       current-type fun)]
       (ref-set current-world-ref world)
       ret)))
 
