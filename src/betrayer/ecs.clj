@@ -98,10 +98,44 @@
   function is passed the component data and any additional args. If the function
   returns nil, the component is not updated. Otherwise, the component data is updated
   with the return value."
-  [world entity type fun & args]
-  (if-let [update (apply fun (get-component world entity type) args)]
-    (add-component world entity type update)
-    world))
+  ([world entity type fun & args]
+   (if-let [update (apply fun (get-component world entity type) args)]
+     (add-component world entity type update)
+     world)))
+
+(defn update-in-component
+  "Updates a component on an entity based on the function. The function should
+  return `[new-data ret]` and returns `[world ret]`. When the world parameter is
+  elided, `dynamic/current-world-ref` is modified, and it returns `ret` instead."
+  ([fun]
+   (dosync
+    (let [[world ret] (update-in-component
+                             @current-world-ref
+                             current-entity
+                             current-type fun)]
+      (ref-set current-world-ref world)
+      ret)))
+
+  ([type fun]
+   (dosync
+    (let [[world ret] (update-in-component
+                       @current-world-ref
+                       current-entity
+                       type
+                       fun)]
+      (ref-set current-world-ref world)
+      ret)))
+
+  ([entity type fun]
+   (dosync
+    (let [[world ret] (update-in-component @current-world-ref entity type fun)]
+      (ref-set current-world-ref world)
+      ret)))
+
+  ([world entity type fun & args]
+   (if-let [[update ret] (apply fun (get-component world entity type) args)]
+     [(add-component world entity type update) ret]
+     world)))
 
 (defn kill-entity
   "Removes an entitity and all its components and returns it."

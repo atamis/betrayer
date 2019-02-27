@@ -3,8 +3,7 @@
             [clojure.test :as t]
             [betrayer.event :as event]
             [clojure.set :as set]
-            [betrayer.system :as system]
-            ))
+            [betrayer.system :as system]))
 
 (def ^:dynamic sys nil)
 
@@ -109,6 +108,21 @@
       (def new-sys (ecs/process-tick sys 1))
       (t/is (= [] (ecs/get-all-entities-with-component new-sys :self-remover)))))
 
+  (t/testing "update-in-components"
+    (let [inc-and-last (fn [n] [(inc n) n])
+          [entity sys]
+          (simple-add-system
+           @sys
+           :updater
+           0
+           (fn [entity]
+             (event/add-event [:topic (ecs/update-in-component entity :updater inc-and-last)])
+             (event/add-event [:topic (ecs/update-in-component :updater inc-and-last)])
+             (event/add-event [:topic (ecs/update-in-component inc-and-last)])))]
+      (def new-sys (ecs/process-tick sys 1))
+      (t/is (= 3 (ecs/get-component new-sys entity :updater)))
+      (t/is (= [0 1 2] (map second (event/drain-events new-sys))))))
+
   (defn setup-entity-remover
     [system]
     (simple-add-system system :self-destructor {} (fn [entity] (ecs/kill-entity))))
@@ -126,8 +140,7 @@
                     (ecs/add-entity entity)
                     (ecs/add-component entity :tick {:n 0 :m 0})
                     (ecs/add-system (system/mapping-system :tick #(update %1 :n inc)))
-                    (ecs/add-system (system/mapping-system :tick (fn [component delta] (update component :m #(+ delta %1)))))
-                    ))
+                    (ecs/add-system (system/mapping-system :tick (fn [component delta] (update component :m #(+ delta %1)))))))
     (t/is (= 0 (:n (ecs/get-component system entity :tick))))
     (t/is (= 0 (:m (ecs/get-component system entity :tick))))
     ; Note delta = 2
@@ -151,8 +164,6 @@
     (t/is (= 10 @counter))
     (def world (ecs/process-tick world 10))
     (def world (ecs/process-tick world 10))
-    (t/is (= 30 @counter))
-    )
-  )
+    (t/is (= 30 @counter))))
 
 
